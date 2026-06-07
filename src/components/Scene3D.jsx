@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
-export default function Scene3D() {
+export default function Scene3D({ progressRef }) {
   const mountRef = useRef(null);
 
   useEffect(() => {
@@ -18,9 +18,9 @@ export default function Scene3D() {
     scene.background = new THREE.Color(0x0a0a1a);
 
     const camera = new THREE.PerspectiveCamera(60, W / H, 0.1, 100);
-    camera.position.z = 3;
+    const baseZ = 3;
+    camera.position.z = baseZ;
 
-    // 조명
     scene.add(new THREE.AmbientLight(0xffffff, 0.4));
     const dir = new THREE.DirectionalLight(0xffffff, 2);
     dir.position.set(3, 5, 3);
@@ -32,7 +32,6 @@ export default function Scene3D() {
     p2.position.set(2, -2, 1);
     scene.add(p2);
 
-    // 토러스 + 구체들
     const torus = new THREE.Mesh(
       new THREE.TorusGeometry(0.8, 0.25, 24, 90),
       new THREE.MeshStandardMaterial({
@@ -74,9 +73,16 @@ export default function Scene3D() {
     const animate = () => {
       raf = requestAnimationFrame(animate);
       const t = clock.getElapsedTime();
+
+      // 스크롤 진행도로 카메라 z 전진
+      const p = progressRef ? progressRef.current : 0;
+      const targetZ = baseZ - p * 2.5;
+      camera.position.z += (targetZ - camera.position.z) * 0.1;
+
       camera.position.x += (mouse.x * 0.5 - camera.position.x) * 0.05;
       camera.position.y += (mouse.y * 0.3 - camera.position.y) * 0.05;
       camera.lookAt(0, 0, 0);
+
       torus.rotation.x = t * 0.4;
       torus.rotation.y = t * 0.5;
       spheres.forEach(({ m, off }) => {
@@ -104,7 +110,7 @@ export default function Scene3D() {
         mount.removeChild(renderer.domElement);
       renderer.dispose();
     };
-  }, []);
+  }, [progressRef]);
 
   return (
     <div

@@ -4,12 +4,21 @@
   box-sizing: border-box;
 }
 
+html,
 body {
-  overflow: hidden;
+  width: 100%;
   background: #fff;
 }
 
+/* 스크롤바 숨기기 */
+html {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+html::-webkit-scrollbar {
+  display: none;
+}
+
 #root {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
 }
