@@ -1,8 +1,38 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import RockModel from "./RockModel";
+
+const PANELS = [
+  {
+    src: "/1.avif",
+    type: "image",
+    pos: [-2.6, 0.2, -0.5],
+    scale: [1.8, 1.0, 1],
+  },
+  {
+    src: "/2.avif",
+    type: "image",
+    pos: [-0.3, 0.9, 0.2],
+    scale: [1.4, 1.8, 1],
+  },
+  {
+    src: "/3.mp4",
+    type: "video",
+    pos: [2.4, -0.3, -0.3],
+    scale: [1.9, 1.1, 1],
+  },
+  { src: "/4.mp4", type: "video", pos: [0.6, -1.4, 0.4], scale: [1.6, 0.9, 1] },
+  {
+    src: "/5.mp4",
+    type: "video",
+    pos: [-1.8, -1.2, 0.6],
+    scale: [1.3, 0.8, 1],
+  },
+];
 
 export default function Scene3D({ progressRef }) {
   const mountRef = useRef(null);
+  const [scene, setScene] = useState(null); // RockModel에 넘길 scene
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -14,53 +44,61 @@ export default function Scene3D({ progressRef }) {
     renderer.setPixelRatio(window.devicePixelRatio);
     mount.appendChild(renderer.domElement);
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0a1a);
+    const sc = new THREE.Scene();
+    sc.background = new THREE.Color(0x0a0a0f);
 
     const camera = new THREE.PerspectiveCamera(60, W / H, 0.1, 100);
-    const baseZ = 3;
+    const baseZ = 4;
     camera.position.z = baseZ;
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+    // ── 조명 ──
+    sc.add(new THREE.AmbientLight(0xffffff, 0.7));
     const dir = new THREE.DirectionalLight(0xffffff, 2);
-    dir.position.set(3, 5, 3);
-    scene.add(dir);
-    const p1 = new THREE.PointLight(0x6644ff, 5, 12);
-    p1.position.set(-2, 2, 2);
-    scene.add(p1);
-    const p2 = new THREE.PointLight(0xff4488, 4, 10);
-    p2.position.set(2, -2, 1);
-    scene.add(p2);
+    dir.position.set(3, 5, 4);
+    sc.add(dir);
+    const orange = new THREE.PointLight(0xff7722, 7, 16);
+    orange.position.set(0, -0.5, 1.5);
+    sc.add(orange);
+    const fill = new THREE.PointLight(0x4466ff, 3, 12);
+    fill.position.set(-3, 2, 3);
+    sc.add(fill);
 
-    const torus = new THREE.Mesh(
-      new THREE.TorusGeometry(0.8, 0.25, 24, 90),
-      new THREE.MeshStandardMaterial({
-        color: 0x8800ff,
-        roughness: 0.1,
-        metalness: 0.9,
-      }),
-    );
-    scene.add(torus);
+    // ── 패널들 ──
+    const videos = [];
+    const panelMeshes = [];
+    const texLoader = new THREE.TextureLoader();
 
-    const spheres = [];
-    [0x3355ff, 0xff3366, 0x00ffaa, 0xffaa00].forEach((c, i) => {
-      const m = new THREE.Mesh(
-        new THREE.SphereGeometry(0.22, 32, 32),
-        new THREE.MeshStandardMaterial({
-          color: c,
-          roughness: 0.15,
-          metalness: 0.85,
-        }),
+    PANELS.forEach((panel) => {
+      let tex;
+      if (panel.type === "video") {
+        const video = document.createElement("video");
+        video.src = panel.src;
+        video.crossOrigin = "anonymous";
+        video.loop = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.play().catch(() => {});
+        videos.push(video);
+        tex = new THREE.VideoTexture(video);
+        tex.colorSpace = THREE.SRGBColorSpace;
+      } else {
+        tex = texLoader.load(panel.src);
+        tex.colorSpace = THREE.SRGBColorSpace;
+      }
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        new THREE.MeshBasicMaterial({ map: tex }),
       );
-      m.position.set(
-        (i % 2 ? 1 : -1) * (0.9 + Math.random() * 0.4),
-        Math.random() - 0.5,
-        (Math.random() - 0.5) * 0.6,
-      );
-      scene.add(m);
-      spheres.push({ m, off: i * 1.5 });
+      mesh.position.set(...panel.pos);
+      mesh.scale.set(...panel.scale);
+      sc.add(mesh);
+      panelMeshes.push(mesh);
     });
 
+    // scene을 RockModel에 넘기기 위해 state로 노출
+    setScene(sc);
+
+    // ── 마우스 ──
     const mouse = { x: 0, y: 0 };
     const onMove = (e) => {
       mouse.x = (e.clientX / W - 0.5) * 2;
@@ -68,28 +106,22 @@ export default function Scene3D({ progressRef }) {
     };
     window.addEventListener("mousemove", onMove);
 
+    // ── 루프 (렌더링 + 패널/카메라) ──
     let raf;
     const clock = new THREE.Clock();
     const animate = () => {
       raf = requestAnimationFrame(animate);
       const t = clock.getElapsedTime();
 
-      // 스크롤 진행도로 카메라 z 전진
-      const p = progressRef ? progressRef.current : 0;
-      const targetZ = baseZ - p * 2.5;
-      camera.position.z += (targetZ - camera.position.z) * 0.1;
-
-      camera.position.x += (mouse.x * 0.5 - camera.position.x) * 0.05;
-      camera.position.y += (mouse.y * 0.3 - camera.position.y) * 0.05;
+      camera.position.x += (mouse.x * 0.4 - camera.position.x) * 0.05;
+      camera.position.y += (mouse.y * 0.25 - camera.position.y) * 0.05;
       camera.lookAt(0, 0, 0);
 
-      torus.rotation.x = t * 0.4;
-      torus.rotation.y = t * 0.5;
-      spheres.forEach(({ m, off }) => {
-        m.position.y = Math.sin(t * 0.8 + off) * 0.4;
-        m.rotation.y = t;
+      panelMeshes.forEach((m, i) => {
+        m.position.y += Math.sin(t * 0.5 + i) * 0.0008;
       });
-      renderer.render(scene, camera);
+
+      renderer.render(sc, camera);
     };
     animate();
 
@@ -106,9 +138,14 @@ export default function Scene3D({ progressRef }) {
       cancelAnimationFrame(raf);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("resize", onResize);
+      videos.forEach((v) => {
+        v.pause();
+        v.src = "";
+      });
       if (mount.contains(renderer.domElement))
         mount.removeChild(renderer.domElement);
       renderer.dispose();
+      setScene(null);
     };
   }, [progressRef]);
 
@@ -122,6 +159,9 @@ export default function Scene3D({ progressRef }) {
         width: "100%",
         height: "100%",
       }}
-    />
+    >
+      {/* scene이 준비되면 돌 모델 추가 */}
+      {scene && <RockModel scene={scene} />}
+    </div>
   );
 }
