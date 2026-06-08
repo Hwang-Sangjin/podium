@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 
-export default function RockModel({ scene }) {
+export default function RockModel({ scene, progressRef }) {
   useEffect(() => {
     if (!scene) return;
 
@@ -12,8 +12,6 @@ export default function RockModel({ scene }) {
     const clock = new THREE.Clock();
 
     const loader = new GLTFLoader();
-
-    // Draco 압축 모델 디코딩 설정
     const draco = new DRACOLoader();
     draco.setDecoderPath(
       "https://www.gstatic.com/draco/versioned/decoders/1.5.7/",
@@ -39,8 +37,11 @@ export default function RockModel({ scene }) {
         const animate = () => {
           raf = requestAnimationFrame(animate);
           const t = clock.getElapsedTime();
-          rock.rotation.y = t * 0.3;
-          rock.rotation.x = Math.sin(t * 0.4) * 0.15;
+          // progressRef는 이미 MaskScene에서 lerp된 부드러운 값
+          const p = progressRef ? progressRef.current : 0;
+
+          // 스크롤 기반 x축 회전만 (세로축 자동회전 제거됨)
+          rock.rotation.x = p * Math.PI * 2; // 스크롤 0~1 → x축 0~360°
           rock.position.y = Math.sin(t * 0.6) * 0.15;
         };
         animate();
@@ -64,7 +65,7 @@ export default function RockModel({ scene }) {
         });
       }
     };
-  }, [scene]);
+  }, [scene, progressRef]);
 
   return null;
 }

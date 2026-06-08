@@ -30,15 +30,17 @@ const PANELS = [
   },
 ];
 
+const FADE_START = 0.35;
+const FADE_END = 0.55;
+
 export default function Scene3D({ progressRef }) {
   const mountRef = useRef(null);
-  const [scene, setScene] = useState(null); // RockModel에 넘길 scene
+  const [scene, setScene] = useState(null);
 
   useEffect(() => {
     const mount = mountRef.current;
-    const W = window.innerWidth;
-    const H = window.innerHeight;
-
+    const W = window.innerWidth,
+      H = window.innerHeight;
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(W, H);
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -46,13 +48,11 @@ export default function Scene3D({ progressRef }) {
 
     const sc = new THREE.Scene();
     sc.background = new THREE.Color(0x0a0a0f);
-
     const camera = new THREE.PerspectiveCamera(60, W / H, 0.1, 100);
-    const baseZ = 4;
-    camera.position.z = baseZ;
+    camera.position.z = 4;
 
-    // ── 조명 ──
-    sc.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const amb = new THREE.AmbientLight(0xffffff, 0.7);
+    sc.add(amb);
     const dir = new THREE.DirectionalLight(0xffffff, 2);
     dir.position.set(3, 5, 4);
     sc.add(dir);
@@ -63,42 +63,39 @@ export default function Scene3D({ progressRef }) {
     fill.position.set(-3, 2, 3);
     sc.add(fill);
 
-    // ── 패널들 ──
-    const videos = [];
-    const panelMeshes = [];
-    const texLoader = new THREE.TextureLoader();
+    const baseIntensity = { amb: 0.7, dir: 2, orange: 7, fill: 3 };
 
+    const videos = [],
+      panelMeshes = [];
+    const texLoader = new THREE.TextureLoader();
     PANELS.forEach((panel) => {
       let tex;
       if (panel.type === "video") {
-        const video = document.createElement("video");
-        video.src = panel.src;
-        video.crossOrigin = "anonymous";
-        video.loop = true;
-        video.muted = true;
-        video.playsInline = true;
-        video.play().catch(() => {});
-        videos.push(video);
-        tex = new THREE.VideoTexture(video);
+        const v = document.createElement("video");
+        v.src = panel.src;
+        v.loop = true;
+        v.muted = true;
+        v.playsInline = true;
+        v.play().catch(() => {});
+        videos.push(v);
+        tex = new THREE.VideoTexture(v);
         tex.colorSpace = THREE.SRGBColorSpace;
       } else {
         tex = texLoader.load(panel.src);
         tex.colorSpace = THREE.SRGBColorSpace;
       }
-      const mesh = new THREE.Mesh(
+      const m = new THREE.Mesh(
         new THREE.PlaneGeometry(1, 1),
         new THREE.MeshBasicMaterial({ map: tex }),
       );
-      mesh.position.set(...panel.pos);
-      mesh.scale.set(...panel.scale);
-      sc.add(mesh);
-      panelMeshes.push(mesh);
+      m.position.set(...panel.pos);
+      m.scale.set(...panel.scale);
+      sc.add(m);
+      panelMeshes.push({ mesh: m, mat: m.material });
     });
 
-    // scene을 RockModel에 넘기기 위해 state로 노출
     setScene(sc);
 
-    // ── 마우스 ──
     const mouse = { x: 0, y: 0 };
     const onMove = (e) => {
       mouse.x = (e.clientX / W - 0.5) * 2;
@@ -106,21 +103,35 @@ export default function Scene3D({ progressRef }) {
     };
     window.addEventListener("mousemove", onMove);
 
-    // ── 루프 (렌더링 + 패널/카메라) ──
     let raf;
     const clock = new THREE.Clock();
     const animate = () => {
       raf = requestAnimationFrame(animate);
       const t = clock.getElapsedTime();
+      const p = progressRef ? progressRef.current : 0;
+
+      // 조명 페이드: FADE_START~FADE_END 구간에서 1 → 0
+      const fade =
+        1 -
+        Math.min(Math.max((p - FADE_START) / (FADE_END - FADE_START), 0), 1);
+      amb.intensity = baseIntensity.amb * fade;
+      dir.intensity = baseIntensity.dir * fade;
+      orange.intensity = baseIntensity.orange * fade;
+      fill.intensity = baseIntensity.fill * fade;
+
+      // 패널도 같이 어두워짐
+      panelMeshes.forEach(({ mat }) => {
+        mat.opacity = fade;
+        mat.transparent = true;
+      });
+
+      // 배경: fade 0이면 완전 검정
+      const bg = 0.04 * fade;
+      sc.background.setRGB(bg * 0.6, bg * 0.6, bg * 0.9);
 
       camera.position.x += (mouse.x * 0.4 - camera.position.x) * 0.05;
       camera.position.y += (mouse.y * 0.25 - camera.position.y) * 0.05;
       camera.lookAt(0, 0, 0);
-
-      panelMeshes.forEach((m, i) => {
-        m.position.y += Math.sin(t * 0.5 + i) * 0.0008;
-      });
-
       renderer.render(sc, camera);
     };
     animate();
@@ -160,8 +171,7 @@ export default function Scene3D({ progressRef }) {
         height: "100%",
       }}
     >
-      {/* scene이 준비되면 돌 모델 추가 */}
-      {scene && <RockModel scene={scene} />}
+      {scene && <RockModel scene={scene} progressRef={progressRef} />}
     </div>
   );
 }
