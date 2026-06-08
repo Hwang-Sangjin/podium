@@ -1,15 +1,24 @@
 import { useEffect, useRef } from "react";
 import gsap from "gsap";
+import { separate } from "flubber";
 import Scene3D from "./Scene3D";
-import { LOGO_PATH } from "./iconPath";
+import {
+  CIRCLE_PATH,
+  LOGO_BODY,
+  LOGO_DOT1,
+  LOGO_DOT2,
+  LOGO_PATH,
+} from "./iconPath";
 
 const SCROLL_DISTANCE = 1500;
 
 export default function MaskScene() {
-  const dotRef = useRef(null);
+  const morphPathRef = useRef(null);
   const logoGroupRef = useRef(null);
   const logoInnerRef = useRef(null);
-  const whiteRectRef = useRef(null);
+  const coverRef = useRef(null); // 모핑 전 3D 가리는 검은 덮개
+  const coverGroupRef = useRef(null);
+  const coverInnerRef = useRef(null);
   const progressRef = useRef(0);
 
   useEffect(() => {
@@ -22,32 +31,57 @@ export default function MaskScene() {
     const tx = (W - iconW) / 2;
     const ty = (H - iconH) / 2;
 
-    logoGroupRef.current.setAttribute(
-      "transform",
-      `translate(${tx}, ${ty}) scale(${fullScale})`,
+    const transform = `translate(${tx}, ${ty}) scale(${fullScale})`;
+    logoGroupRef.current.setAttribute("transform", transform);
+    coverGroupRef.current.setAttribute("transform", transform);
+
+    const morphPath = morphPathRef.current;
+    const logoInner = logoInnerRef.current;
+    const cover = coverRef.current;
+
+    // flubber: 원 → 로고 분리 모핑
+    const interpolator = separate(
+      CIRCLE_PATH,
+      [LOGO_BODY, LOGO_DOT1, LOGO_DOT2],
+      { single: true, maxSegmentLength: 0.05 },
     );
 
-    const dot = dotRef.current;
-    const logoInner = logoInnerRef.current;
+    // 모핑 path: 마스크 구멍 + 검은 덮개 둘 다 같은 d 사용
+    const setMorphD = (d) => {
+      morphPath.setAttribute("d", d);
+      coverInnerRef.current.setAttribute("d", d);
+    };
+
+    setMorphD(interpolator(0));
+    gsap.set(morphPath, { opacity: 1 });
+    gsap.set(logoInner, { opacity: 0 });
+    gsap.set(cover, { opacity: 1 }); // 처음엔 검은 덮개 보임 → 3D 가림
+
+    // 1단계: 원 → 로고 모핑
+    const morphObj = { t: 0 };
+    const intro = gsap.timeline({ delay: 0.8 });
+    intro.to(morphObj, {
+      t: 1,
+      duration: 1.2,
+      ease: "power2.inOut",
+      onUpdate: () => setMorphD(interpolator(morphObj.t)),
+      onComplete: () => {
+        gsap.set(logoInner, { opacity: 1 });
+        gsap.set(morphPath, { opacity: 0 });
+        // 검은 덮개 페이드아웃 → 3D 드러남
+        gsap.to(cover, { opacity: 0, duration: 0.5, ease: "power2.out" });
+      },
+    });
+
+    // 2단계: 스크롤 → 마스크 확장
+    const diag = Math.sqrt(W * W + H * H);
+    const maxScale = (diag / iconW) * 30;
 
     gsap.set(logoInner, {
-      opacity: 0,
-      scale: 0.1,
+      scale: 1,
       transformOrigin: "center center",
       svgOrigin: "25 16",
     });
-    gsap.set(dot, { scale: 1, opacity: 1 });
-
-    // 1단계: 로딩
-    const intro = gsap.timeline({ delay: 0.8 });
-    intro
-      .to(dot, { scale: 0, opacity: 0, duration: 0.25, ease: "power2.in" })
-      .to(logoInner, { opacity: 1, duration: 0.01 }, "<")
-      .to(logoInner, { scale: 1, duration: 0.6, ease: "power3.out" }, "<");
-
-    // 2단계: 스크롤 → 마스크 확장 (페이드아웃 없음, 확장 범위 ↑)
-    const diag = Math.sqrt(W * W + H * H);
-    const maxScale = (diag / iconW) * 25;
 
     const onScroll = () => {
       const p = Math.min(window.scrollY / SCROLL_DISTANCE, 1);
@@ -65,7 +99,6 @@ export default function MaskScene() {
   return (
     <>
       <div style={{ height: `calc(100vh + ${SCROLL_DISTANCE}px)` }} />
-
       <div
         style={{
           position: "fixed",
@@ -93,34 +126,29 @@ export default function MaskScene() {
             <mask id="logoMask">
               <rect width="100%" height="100%" fill="white" />
               <g ref={logoGroupRef}>
+                <path ref={morphPathRef} fill="black" />
                 <g ref={logoInnerRef}>
                   <path d={LOGO_PATH} fill="black" />
                 </g>
               </g>
             </mask>
           </defs>
+
+          {/* 흰 레이어 — 구멍으로 3D(또는 덮개) 비침 */}
           <rect
-            ref={whiteRectRef}
             width="100%"
             height="100%"
             fill="#ffffff"
             mask="url(#logoMask)"
           />
-        </svg>
 
-        <div
-          ref={dotRef}
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: "30px",
-            height: "30px",
-            borderRadius: "50%",
-            background: "#000",
-          }}
-        />
+          {/* 검은 덮개 — 모핑 중 구멍 안 3D 가림. 모핑 끝나면 페이드아웃 */}
+          <g ref={coverRef}>
+            <g ref={coverGroupRef}>
+              <path ref={coverInnerRef} fill="#000000" />
+            </g>
+          </g>
+        </svg>
       </div>
     </>
   );
