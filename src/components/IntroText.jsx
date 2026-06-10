@@ -1,9 +1,8 @@
 import { useEffect, useRef } from "react";
 
-const BG_START = 0.78; // 흰 배경 페이드 시작
-const BG_END = 0.86; // 흰 배경 완성
-const TEXT_START = 0.86; // 배경 다 깔린 후 텍스트 등장 시작
-
+const BG_START = 0.78;
+const BG_END = 0.86;
+const TEXT_START = 0.86;
 const BTS = ["#3a3a3a", "#2e4f3a", "#5a2e1a", "#1e3a4f", "#6b6320"];
 
 export default function IntroText({ progressRef }) {
@@ -16,23 +15,20 @@ export default function IntroText({ progressRef }) {
       raf = requestAnimationFrame(tick);
       const p = progressRef ? progressRef.current : 0;
 
-      // 흰 배경 페이드인
       const bgP = Math.min(
         Math.max((p - BG_START) / (BG_END - BG_START), 0),
         1,
       );
       if (bgRef.current) bgRef.current.style.opacity = String(bgP);
 
-      // 텍스트: 아래에서 위로 올라오며 페이드인
       const txtP = Math.min(
         Math.max((p - TEXT_START) / (1 - TEXT_START), 0),
         1,
       );
       if (textRef.current) {
         textRef.current.style.opacity = String(txtP);
-        // -50% 중앙 정렬 유지 + 등장 시 아래에서 올라옴
-        const rise = (1 - txtP) * 120;
-        textRef.current.style.transform = `translateY(calc(-50% + ${rise}px))`;
+        // 화면 절반 높이(50vh)만큼 아래에서 올라옴
+        textRef.current.style.transform = `translateY(${(1 - txtP) * 50}vh)`;
       }
     };
     tick();
@@ -41,7 +37,6 @@ export default function IntroText({ progressRef }) {
 
   return (
     <>
-      {/* 흰 배경 오버레이 */}
       <div
         ref={bgRef}
         style={{
@@ -56,14 +51,13 @@ export default function IntroText({ progressRef }) {
         }}
       />
 
-      {/* lorem 텍스트 + Behind the scenes */}
+      {/* 텍스트 블록을 화면 위쪽 50%에서 시작 (top: 50%) */}
       <div
         ref={textRef}
         style={{
           position: "absolute",
           left: 0,
-          top: "50%", // 세로 중앙 기준
-          transform: "translateY(-50%)",
+          top: "50%",
           width: "100%",
           padding: "0 60px",
           opacity: 0,
@@ -84,7 +78,7 @@ export default function IntroText({ progressRef }) {
           style={{
             margin: 0,
             color: "#000",
-            fontSize: "clamp(32px, 5vw, 72px)",
+            fontSize: "clamp(28px, 4vw, 60px)",
             fontWeight: 800,
             lineHeight: 1.05,
             letterSpacing: "-0.02em",
@@ -94,8 +88,7 @@ export default function IntroText({ progressRef }) {
           Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
           eiusmod tempor incididunt ut labore.
         </p>
-
-        <div style={{ marginTop: 48 }}>
+        <div style={{ marginTop: 40 }}>
           <div
             style={{
               fontSize: 13,
@@ -113,7 +106,7 @@ export default function IntroText({ progressRef }) {
                 key={i}
                 style={{
                   flex: 1,
-                  aspectRatio: "3/4",
+                  height: "200px",
                   background: c,
                   borderRadius: 2,
                 }}
