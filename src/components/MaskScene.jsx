@@ -12,7 +12,7 @@ import {
   LOGO_PATH,
 } from "./iconPath";
 
-const SCROLL_DISTANCE = 5000;
+const SCROLL_DISTANCE = 8000;
 const EXPAND_END = 0.35;
 
 export default function MaskScene() {
