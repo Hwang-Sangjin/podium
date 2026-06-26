@@ -14,10 +14,9 @@ const ITEMS = [
   { title: "HORIZON", client: "ADIDAS", year: "2026", color: "#3a2e5a" },
 ];
 
-// grid가 화면 위로 빠져나가는 양 (아래 줄까지 보이게)
 const OVERSCROLL = 120;
 
-export default function WorkGrid({ progressRef, startAt = 0.45 }) {
+export default function WorkGrid({ progressRef, startAt = 0.3, endAt = 0.55 }) {
   const wrapRef = useRef(null);
 
   useEffect(() => {
@@ -25,8 +24,15 @@ export default function WorkGrid({ progressRef, startAt = 0.45 }) {
     const tick = () => {
       raf = requestAnimationFrame(tick);
       const p = progressRef ? progressRef.current : 0;
-      const local = Math.min(Math.max((p - startAt) / (1 - startAt), 0), 1);
-      // local 0→1 : translateY 100vh → -OVERSCROLL vh (화면 위로 통과)
+
+      // endAt 이후엔 완전히 숨김
+      if (p >= endAt) {
+        if (wrapRef.current) wrapRef.current.style.opacity = "0";
+        return;
+      }
+
+      // startAt~endAt 구간만 움직임
+      const local = Math.min(Math.max((p - startAt) / (endAt - startAt), 0), 1);
       const ty = 100 - local * (100 + OVERSCROLL);
       if (wrapRef.current) {
         wrapRef.current.style.transform = `translateY(${ty}vh)`;
@@ -35,7 +41,7 @@ export default function WorkGrid({ progressRef, startAt = 0.45 }) {
     };
     tick();
     return () => cancelAnimationFrame(raf);
-  }, [progressRef, startAt]);
+  }, [progressRef, startAt, endAt]);
 
   return (
     <div

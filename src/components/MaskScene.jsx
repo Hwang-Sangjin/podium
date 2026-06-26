@@ -12,8 +12,8 @@ import {
   LOGO_PATH,
 } from "./iconPath";
 
-const SCROLL_DISTANCE = 8000;
-const EXPAND_END = 0.35;
+const SCROLL_DISTANCE = 10000;
+const EXPAND_END = 0.2;
 
 export default function MaskScene() {
   const morphPathRef = useRef(null);
@@ -121,7 +121,6 @@ export default function MaskScene() {
         }}
       >
         <Scene3D progressRef={progressRef} />
-
         <svg
           width="100%"
           height="100%"
@@ -155,10 +154,7 @@ export default function MaskScene() {
             </g>
           </g>
         </svg>
-
-        <WorkGrid progressRef={progressRef} startAt={0.45} />
-
-        {/* 흰 배경 전환 + lorem 텍스트 */}
+        <WorkGrid progressRef={progressRef} startAt={0.3} endAt={0.55} />
         <IntroText progressRef={progressRef} />
       </div>
     </>

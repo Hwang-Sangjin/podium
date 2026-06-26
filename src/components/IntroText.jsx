@@ -1,10 +1,13 @@
 import { useEffect, useRef } from "react";
 
-const BG_START = 0.78;
-const BG_END = 0.86;
-const SCROLL_START = 0.86; // 콘텐츠가 위로 흐르기 시작
-const BTS = ["#3a3a3a", "#2e4f3a", "#5a2e1a", "#1e3a4f", "#6b6320", "#3a2e5a"];
+const BG_START = 0.5;
+const BG_END = 0.54;
+const BG_FADEOUT_START = 0.83;
+const BG_FADEOUT_END = 0.95;
+const SCROLL_START = 0.54;
+const SCROLL_END = 0.95;
 
+const BTS = ["#3a3a3a", "#2e4f3a", "#5a2e1a", "#1e3a4f", "#6b6320", "#3a2e5a"];
 const SERVICES = [
   "Creative Direction",
   "Video Production",
@@ -55,22 +58,34 @@ export default function IntroText({ progressRef }) {
       raf = requestAnimationFrame(tick);
       const p = progressRef ? progressRef.current : 0;
 
-      // 흰 배경 페이드인
-      const bgP = Math.min(
-        Math.max((p - BG_START) / (BG_END - BG_START), 0),
-        1,
-      );
-      if (bgRef.current) bgRef.current.style.opacity = String(bgP);
+      // 흰 배경: 페이드인 → 유지 → 천천히 페이드아웃
+      let bgOp = 0;
+      if (p < BG_END) {
+        bgOp = Math.min(Math.max((p - BG_START) / (BG_END - BG_START), 0), 1);
+      } else if (p < BG_FADEOUT_START) {
+        bgOp = 1;
+      } else {
+        bgOp =
+          1 -
+          Math.min(
+            Math.max(
+              (p - BG_FADEOUT_START) / (BG_FADEOUT_END - BG_FADEOUT_START),
+              0,
+            ),
+            1,
+          );
+      }
+      if (bgRef.current) bgRef.current.style.opacity = String(bgOp);
 
-      // 콘텐츠: SCROLL_START 이후 progress에 따라 위로 흐름
+      // 콘텐츠: 배경과 독립적으로 위로 계속 흐름
       const scrollP = Math.min(
-        Math.max((p - SCROLL_START) / (1 - SCROLL_START), 0),
+        Math.max((p - SCROLL_START) / (SCROLL_END - SCROLL_START), 0),
         1,
       );
+      const ty = 80 - scrollP * 320;
+
       if (contentRef.current) {
-        contentRef.current.style.opacity = String(bgP);
-        // 콘텐츠가 충분히 위로 빠지도록 이동 범위 확대
-        const ty = 80 - scrollP * 280; // 80vh → -200vh (3블록까지 다 통과)
+        contentRef.current.style.opacity = String(bgOp);
         contentRef.current.style.transform = `translateY(${ty}vh)`;
       }
     };
@@ -80,7 +95,6 @@ export default function IntroText({ progressRef }) {
 
   return (
     <>
-      {/* 흰 배경 */}
       <div
         ref={bgRef}
         style={{
@@ -95,7 +109,6 @@ export default function IntroText({ progressRef }) {
         }}
       />
 
-      {/* 콘텐츠 컨테이너 (세로로 길게, progress에 따라 위로 흐름) */}
       <div
         ref={contentRef}
         style={{
@@ -108,7 +121,7 @@ export default function IntroText({ progressRef }) {
           pointerEvents: "none",
         }}
       >
-        {/* 1. Available Worldwide + 큰 텍스트 */}
+        {/* 1. Available Worldwide + 큰 텍스트 + Behind scenes */}
         <div
           style={{
             minHeight: "100vh",
@@ -142,7 +155,6 @@ export default function IntroText({ progressRef }) {
             We help sports brands tell stories through fieldwork, narrative, and
             creative research, with deep production expertise.
           </p>
-          {/* Behind the scenes */}
           <div style={{ marginTop: 80 }}>
             <div
               style={{
@@ -172,7 +184,7 @@ export default function IntroText({ progressRef }) {
           </div>
         </div>
 
-        {/* 2. We've worked with... 큰 제목 */}
+        {/* 2. We've worked with */}
         <div
           style={{ minHeight: "70vh", display: "flex", alignItems: "center" }}
         >
@@ -200,7 +212,6 @@ export default function IntroText({ progressRef }) {
               gridTemplateRows: "auto auto auto",
             }}
           >
-            {/* CLIENTS — 오른쪽 위 */}
             <div
               style={{
                 gridColumn: "2 / 4",
@@ -216,7 +227,6 @@ export default function IntroText({ progressRef }) {
                 </div>
               ))}
             </div>
-            {/* SERVICES — 왼쪽, 아래 정렬로 겹침 */}
             <div
               style={{
                 gridColumn: "1 / 2",
@@ -233,7 +243,6 @@ export default function IntroText({ progressRef }) {
                 </div>
               ))}
             </div>
-            {/* ATHLETES — 아래 전체 */}
             <div
               style={{
                 gridColumn: "1 / 3",

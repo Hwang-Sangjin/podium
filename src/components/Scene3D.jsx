@@ -30,8 +30,10 @@ const PANELS = [
   },
 ];
 
-const FADE_START = 0.35;
-const FADE_END = 0.55;
+const FADE_START = 0.2;
+const FADE_END = 0.35;
+const REFADE_START = 0.92;
+const REFADE_END = 1.0;
 
 export default function Scene3D({ progressRef }) {
   const mountRef = useRef(null);
@@ -47,7 +49,7 @@ export default function Scene3D({ progressRef }) {
     mount.appendChild(renderer.domElement);
 
     const sc = new THREE.Scene();
-    sc.background = new THREE.Color(0x0a0a0f);
+    sc.background = new THREE.Color(0x000000);
     const camera = new THREE.PerspectiveCamera(60, W / H, 0.1, 100);
     camera.position.z = 4;
 
@@ -96,13 +98,6 @@ export default function Scene3D({ progressRef }) {
 
     setScene(sc);
 
-    const mouse = { x: 0, y: 0 };
-    const onMove = (e) => {
-      mouse.x = (e.clientX / W - 0.5) * 2;
-      mouse.y = -(e.clientY / H - 0.5) * 2;
-    };
-    window.addEventListener("mousemove", onMove);
-
     let raf;
     const clock = new THREE.Clock();
     const animate = () => {
@@ -110,27 +105,39 @@ export default function Scene3D({ progressRef }) {
       const t = clock.getElapsedTime();
       const p = progressRef ? progressRef.current : 0;
 
-      // 조명 페이드: FADE_START~FADE_END 구간에서 1 → 0
-      const fade =
+      // 1차 페이드아웃 (0.20~0.35 검정으로)
+      let fade =
         1 -
         Math.min(Math.max((p - FADE_START) / (FADE_END - FADE_START), 0), 1);
+
+      // 2차 재등장 (0.92~1.00 다시 밝아짐)
+      const refade = Math.min(
+        Math.max((p - REFADE_START) / (REFADE_END - REFADE_START), 0),
+        1,
+      );
+      const isRefading = p >= REFADE_START;
+      fade = Math.max(fade, refade);
+
       amb.intensity = baseIntensity.amb * fade;
       dir.intensity = baseIntensity.dir * fade;
       orange.intensity = baseIntensity.orange * fade;
       fill.intensity = baseIntensity.fill * fade;
 
-      // 패널도 같이 어두워짐
+      // 패널: 재등장 구간에선 숨김 (돌만 보이게)
       panelMeshes.forEach(({ mat }) => {
-        mat.opacity = fade;
+        mat.opacity = isRefading ? 0 : fade;
         mat.transparent = true;
       });
 
-      // 배경: fade 0이면 완전 검정
-      const bg = 0.04 * fade;
-      sc.background.setRGB(bg * 0.6, bg * 0.6, bg * 0.9);
+      // 배경: 재등장 구간엔 완전 검정
+      if (isRefading) {
+        sc.background.setRGB(0, 0, 0);
+      } else {
+        const bg = 0.04 * fade;
+        sc.background.setRGB(bg * 0.6, bg * 0.6, bg * 0.9);
+      }
 
-      camera.position.x += (mouse.x * 0.4 - camera.position.x) * 0.05;
-      camera.position.y += (mouse.y * 0.25 - camera.position.y) * 0.05;
+      // 카메라 고정
       camera.lookAt(0, 0, 0);
       renderer.render(sc, camera);
     };
@@ -147,7 +154,6 @@ export default function Scene3D({ progressRef }) {
 
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener("mousemove", onMove);
       window.removeEventListener("resize", onResize);
       videos.forEach((v) => {
         v.pause();
